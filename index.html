@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#163b4f">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Retiros">
+  <title>Retiros</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="app">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">Control de caja</p>
+        <h1>Retiros</h1>
+      </div>
+      <button class="icon-button" id="backupBtn" title="Respaldar datos">⇩</button>
+    </header>
+
+    <section class="summary-grid">
+      <article>
+        <span>Hoy</span>
+        <strong id="todayTotal">$0</strong>
+      </article>
+      <article>
+        <span>Mes</span>
+        <strong id="monthTotal">$0</strong>
+      </article>
+      <article>
+        <span>Registros mes</span>
+        <strong id="monthCount">0</strong>
+      </article>
+    </section>
+
+    <section class="view active" id="withdrawView">
+      <form class="card form" id="withdrawForm">
+        <div class="card-head">
+          <h2>Nuevo retiro</h2>
+        </div>
+        <label>Fecha
+          <input id="withdrawDate" type="date" required>
+        </label>
+        <label>Cantidad
+          <input id="withdrawAmount" type="number" min="1" step="1" inputmode="numeric" placeholder="Ej: 50000" required>
+        </label>
+        <fieldset class="method-picker">
+          <legend>Método</legend>
+          <div class="method-options" id="withdrawMethod">
+            <button class="method-option active" type="button" data-method="efectivo">Efectivo</button>
+            <button class="method-option" type="button" data-method="tarjeta">Tarjeta</button>
+          </div>
+        </fieldset>
+        <label>Motivo / nota
+          <input id="withdrawNote" placeholder="Opcional">
+        </label>
+        <div class="preview-row">
+          <span>Total retiro</span>
+          <strong id="withdrawPreview">$0</strong>
+        </div>
+        <button class="primary" type="submit">Guardar retiro</button>
+      </form>
+
+      <section class="card">
+        <div class="card-head">
+          <h2>Últimos retiros</h2>
+          <button class="text-button" data-tab-target="history">Ver todo</button>
+        </div>
+        <div class="list" id="recentWithdrawals"></div>
+      </section>
+    </section>
+
+    <section class="view" id="dashboardView">
+      <section class="card">
+        <div class="card-head">
+          <h2>Dashboard</h2>
+        </div>
+        <label>Mes
+          <select id="dashboardMonth"></select>
+        </label>
+        <div class="report-grid">
+          <div><span>Total retiros</span><strong id="selectedTotal">$0</strong></div>
+          <div><span>Cantidad de retiros</span><strong id="selectedCount">0</strong></div>
+          <div><span>Efectivo</span><strong id="selectedCash">$0</strong></div>
+          <div><span>Tarjeta</span><strong id="selectedCard">$0</strong></div>
+          <div><span>Promedio por retiro</span><strong id="selectedAverage">$0</strong></div>
+          <div><span>Día con más retiros</span><strong id="selectedTopDay">-</strong></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <h2>Últimos meses</h2>
+        </div>
+        <div class="list" id="monthList"></div>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <h2>Por método</h2>
+        </div>
+        <div class="method-bars">
+          <div>
+            <div class="bar-head"><span>Efectivo</span><strong id="cashPercent">0%</strong></div>
+            <div class="bar"><span id="cashBar"></span></div>
+          </div>
+          <div>
+            <div class="bar-head"><span>Tarjeta</span><strong id="cardPercent">0%</strong></div>
+            <div class="bar"><span id="cardBar"></span></div>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <section class="view" id="historyView">
+      <section class="card">
+        <div class="card-head">
+          <h2>Historial</h2>
+          <select id="historyFilter">
+            <option value="all">Todos</option>
+            <option value="efectivo">Efectivo</option>
+            <option value="tarjeta">Tarjeta</option>
+          </select>
+        </div>
+        <div class="list long-list" id="historyList"></div>
+      </section>
+
+      <section class="card backup-card">
+        <h2>Respaldo</h2>
+        <p>Exporta tus datos seguido. Si borras datos del navegador, podrías perder la base local.</p>
+        <button class="secondary" id="exportBtn">Exportar respaldo</button>
+        <button class="secondary" id="showBackupBtn">Mostrar respaldo</button>
+        <button class="secondary" id="copyBackupBtn">Copiar respaldo</button>
+        <textarea id="backupText" class="backup-text" readonly placeholder="El respaldo aparecerá aquí."></textarea>
+        <label class="file-button">Importar respaldo
+          <input id="importFile" type="file" accept="application/json">
+        </label>
+        <button class="danger" id="resetBtn">Borrar todo</button>
+      </section>
+    </section>
+  </main>
+
+  <nav class="tabbar" aria-label="Navegación">
+    <button class="tab active" data-tab="withdraw">Retiros</button>
+    <button class="tab" data-tab="dashboard">Panel</button>
+    <button class="tab" data-tab="history">Historial</button>
+  </nav>
+
+  <div class="pin-modal" id="pinModal" hidden>
+    <div class="pin-card" role="dialog" aria-modal="true" aria-labelledby="pinTitle">
+      <h2 id="pinTitle">Confirmar eliminación</h2>
+      <p id="pinMessage">Ingresa la clave para continuar.</p>
+      <input id="pinInput" type="password" inputmode="numeric" autocomplete="off" placeholder="Clave">
+      <div class="pin-actions">
+        <button class="secondary" id="pinCancel" type="button">Cancelar</button>
+        <button class="danger" id="pinConfirm" type="button">Eliminar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <script src="libreria-seed.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
