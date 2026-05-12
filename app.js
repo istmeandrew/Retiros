@@ -2,11 +2,12 @@ const DB_NAME = "retiros-local-db";
 const DB_VERSION = 1;
 const STORE_NAME = "withdrawals";
 const DELETE_PIN = "4818";
-const LIBRERIA_SEED_KEY = "retiros-libreria-seed-v1";
+const LIBRERIA_SEED_STATUS_KEY = "retiros-libreria-seed-status-v2";
 
 let db;
 let pendingPinResolver = null;
 let importedSeedCount = 0;
+let refreshing = false;
 let state = {
   withdrawals: [],
   selectedMethod: "efectivo"
@@ -155,6 +156,20 @@ function rowsBetween(start, end) {
   return state.withdrawals.filter((row) => isInPeriod(row.date, start, end));
 }
 
+function rowsForMonth(key) {
+  const { start, end } = monthRange(key);
+  return rowsBetween(start, end);
+}
+
+function summaryMonthKey() {
+  const selectedMonth = $("#dashboardMonth")?.value;
+  if (selectedMonth) return selectedMonth;
+  const currentMonth = monthKey(new Date());
+  if (rowsForMonth(currentMonth).length) return currentMonth;
+  const lastMonthWithRows = availableMonthKeys().find((key) => rowsForMonth(key).length);
+  return lastMonthWithRows || currentMonth;
+}
+
 function summarize(rows) {
   const total = rows.reduce((sum, row) => sum + row.amount, 0);
   const cash = rows.filter((row) => row.method === "efectivo").reduce((sum, row) => sum + row.amount, 0);
@@ -216,10 +231,16 @@ async function loadState() {
 
 async function importLibreriaSeedOnce() {
   const seed = window.RETIROS_LIBRERIA_SEED;
-  if (!Array.isArray(seed) || !seed.length || localStorage.getItem(LIBRERIA_SEED_KEY) === "done") return;
-  for (const row of seed) await put(row);
-  importedSeedCount = seed.length;
-  localStorage.setItem(LIBRERIA_SEED_KEY, "done");
+  if (!Array.isArray(seed) || !seed.length) return;
+  const seedStatus = localStorage.getItem(LIBRERIA_SEED_STATUS_KEY);
+  if (seedStatus === "cleared") return;
+  const existingRows = await getAll();
+  if (seedStatus === "done" && existingRows.length) return;
+  const existingIds = new Set(existingRows.map((row) => row.id));
+  const missingRows = seed.filter((row) => !existingIds.has(row.id));
+  for (const row of missingRows) await put(row);
+  importedSeedCount = missingRows.length;
+  localStorage.setItem(LIBRERIA_SEED_STATUS_KEY, "done");
 }
 
 function setTab(tab) {
@@ -275,9 +296,12 @@ async function deleteWithdrawal(id) {
 function renderSummary() {
   const now = new Date();
   const todayRows = rowsBetween(startOfDay(now), new Date(startOfDay(now).getTime() + 86400000));
-  const monthRows = rowsBetween(startOfMonth(now), nextMonth(now));
+  const key = summaryMonthKey();
+  const monthRows = rowsForMonth(key);
   const month = summarize(monthRows);
   $("#todayTotal").textContent = money(summarize(todayRows).total);
+  $("#summaryMonthLabel").textContent = monthLabel(key);
+  $("#summaryCountLabel").textContent = `Registros ${monthLabel(key)}`;
   $("#monthTotal").textContent = money(month.total);
   $("#monthCount").textContent = month.count;
 }
@@ -317,6 +341,7 @@ function renderSelectedMonth() {
   const key = $("#dashboardMonth").value || monthKey(new Date());
   const { start, end } = monthRange(key);
   const data = summarize(rowsBetween(start, end));
+  renderSummary();
   $("#selectedTotal").textContent = money(data.total);
   $("#selectedCount").textContent = data.count;
   $("#selectedCash").textContent = money(data.cash);
@@ -414,6 +439,7 @@ async function importData(file) {
   if (!Array.isArray(imported.withdrawals)) throw new Error("Respaldo inválido");
   await clearAll();
   for (const row of imported.withdrawals) await put(row);
+  localStorage.setItem(LIBRERIA_SEED_STATUS_KEY, "done");
   await refresh();
 }
 
@@ -421,6 +447,7 @@ async function resetData() {
   const authorized = await authorizeDeletion("Ingresa la clave para borrar todos los retiros.");
   if (!authorized) return;
   await clearAll();
+  localStorage.setItem(LIBRERIA_SEED_STATUS_KEY, "cleared");
   await refresh();
   showToast("Datos borrados");
 }
@@ -436,8 +463,14 @@ function render() {
 }
 
 async function refresh() {
-  await loadState();
-  render();
+  if (refreshing) return;
+  refreshing = true;
+  try {
+    await loadState();
+    render();
+  } finally {
+    refreshing = false;
+  }
 }
 
 function bind() {
@@ -480,6 +513,10 @@ function bind() {
     }
   });
   $("#resetBtn").addEventListener("click", resetData);
+  window.addEventListener("focus", refresh);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) refresh();
+  });
 }
 
 function escapeHtml(value) {
