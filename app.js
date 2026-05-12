@@ -414,6 +414,23 @@ function exportData() {
   showToast("Respaldo listo");
 }
 
+async function shareBackupFile() {
+  const text = backupText();
+  putBackupOnScreen(text);
+  const fileName = `respaldo-retiros-${todayInputValue()}.json`;
+  const file = new File([text], fileName, { type: "application/json" });
+  if (navigator.canShare?.({ files: [file] }) && navigator.share) {
+    await navigator.share({
+      title: "Respaldo Retiros",
+      text: "Guardar respaldo de Retiros",
+      files: [file]
+    });
+    showToast("Respaldo compartido");
+    return;
+  }
+  exportData();
+}
+
 function showBackupText() {
   putBackupOnScreen();
   showToast("Respaldo generado en pantalla");
@@ -493,6 +510,9 @@ function bind() {
   });
   $("#backupBtn").addEventListener("click", exportData);
   $("#exportBtn").addEventListener("click", exportData);
+  $("#shareBackupBtn").addEventListener("click", () => {
+    shareBackupFile().catch(() => showToast("No se pudo compartir"));
+  });
   $("#showBackupBtn").addEventListener("click", showBackupText);
   $("#copyBackupBtn").addEventListener("click", copyBackupText);
   $("#pinCancel").addEventListener("click", () => closePinModal(null));
